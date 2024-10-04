@@ -2,7 +2,12 @@ import streamlit as st
 import psycopg2
 
 # Establish a connection to the PostgreSQL database
-connection = psycopg2.connect(database="questo", user="postgres", password="xtc.qq10mnc", port=5432)
+# connection = psycopg2.connect(database="questo", user="postgres", password="xtc.qq10mnc", port=5432)
+
+# URI for connecting to the PostgreSQL database
+uri = "postgresql://postgres:IagPlmeshhHlaZXGxfTpTolhdbkaVOXO@autorack.proxy.rlwy.net:46248/railway"
+# Establish the connection using the URI
+connection = psycopg2.connect(uri)
 
 class Admin:
     def __init__(self):
@@ -10,7 +15,7 @@ class Admin:
 
     def add_survey(self, survey_name):
         cursor = connection.cursor()
-        insert_query = "INSERT INTO surveys (name) VALUES (%s) RETURNING surveyid, name;"
+        insert_query = "INSERT INTO surveys (survey_name) VALUES (%s) RETURNING id, survey_name;"
         cursor.execute(insert_query, (survey_name,))
         survey_info = cursor.fetchone()  # Fetching the survey ID and name
         connection.commit()
@@ -19,24 +24,24 @@ class Admin:
 
     def add_question(self, survey_id, type_id, question, options=None):
         cursor = connection.cursor()
-        insert_question_query = "INSERT INTO questions (surveyID, typeID, question) VALUES (%s, %s, %s) RETURNING questionID, question;"
+        insert_question_query = "INSERT INTO questions (survey_id, type_id, question) VALUES (%s, %s, %s) RETURNING id, question;"
         cursor.execute(insert_question_query, (survey_id, type_id, question))
         question_info = cursor.fetchone()  # Fetching the question ID and text
 
         if type_id in (1, 2):  # Multiple Choice or Checkbox
             if options and len(options) == 4:  # Must provide exactly 4 options
                 for option in options:
-                    insert_options_query = "INSERT INTO options (questionID, option_text) VALUES (%s, %s);"
+                    insert_options_query = "INSERT INTO options (question_id, option_text) VALUES (%s, %s);"
                     cursor.execute(insert_options_query, (question_info[0], option))
             else:
                 st.error("Error: For Multiple Choice or Checkbox, exactly 4 options are required.")
                 connection.rollback()
                 return None
             
-        elif type_id == 5:  # Rating
+        elif type_id == 4:  # Rating
             rating_options = [str(i) for i in range(1, 6)]  # Rating options 1 to 5
             for option in rating_options:
-                insert_options_query = "INSERT INTO options (questionID, option_text) VALUES (%s, %s);"
+                insert_options_query = "INSERT INTO options (question_id, option_text) VALUES (%s, %s);"
                 cursor.execute(insert_options_query, (question_info[0], option))
         
         connection.commit()
@@ -52,26 +57,26 @@ class Admin:
             "type_id": type_id,
             "type_name": question_type_name,
             "options": options if type_id in (1, 2) else None,
-            "rating_range": "1 to 5" if type_id == 5 else None
+            "rating_range": "1 to 5" if type_id == 4 else None
         }
 
     def get_question_types(self):
         cursor = connection.cursor()
-        cursor.execute("SELECT * FROM qtype;")
+        cursor.execute("SELECT * FROM question_type;")  # Ensure to query the correct table
         question_types = cursor.fetchall()
         cursor.close()
         return question_types
 
     def get_survey_name(self, survey_id):
         cursor = connection.cursor()
-        cursor.execute("SELECT name FROM surveys WHERE surveyid = %s;", (survey_id,))
+        cursor.execute("SELECT survey_name FROM surveys WHERE id = %s;", (survey_id,))
         survey_name = cursor.fetchone()[0]
         cursor.close()
         return survey_name
 
     def get_question_type_name(self, type_id):
         cursor = connection.cursor()
-        cursor.execute("SELECT question_type FROM qtype WHERE id = %s;", (type_id,))
+        cursor.execute("SELECT question_type FROM question_type WHERE id = %s;", (type_id,))
         question_type_name = cursor.fetchone()[0]
         cursor.close()
         return question_type_name
